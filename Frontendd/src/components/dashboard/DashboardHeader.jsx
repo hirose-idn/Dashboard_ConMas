@@ -52,7 +52,7 @@ function Clock() {
 }
 
 // ─── Header utama dashboard ───────────────────────────────
-export default function DashboardHeader({ loading, error, lastRefresh, line, nama_produk }) {
+export default function DashboardHeader({ loading, error, line, nama_produk }) {
   return (
     <div
       style={{
@@ -119,17 +119,34 @@ export default function DashboardHeader({ loading, error, lastRefresh, line, nam
         </div>
       </div>
 
-      <div style={{ textAlign: "right", display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2 }}>
+      <div
+        style={{
+          textAlign: "right",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "flex-end",
+          gap: 2,
+        }}
+      >
         {/* LINE — besar */}
         <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
-          <span style={{ fontSize: 10, color: C.textDim, letterSpacing: "0.12em" }}>LINE</span>
-          <span style={{ fontSize: 28, fontWeight: 900, color: C.green, letterSpacing: "0.08em", lineHeight: 1, textShadow: `0 0 16px ${C.green}88` }}>
+          <span
+            style={{ fontSize: 10, color: C.textDim, letterSpacing: "0.12em" }}
+          >
+            LINE
+          </span>
+          <span
+            style={{
+              fontSize: 28,
+              fontWeight: 900,
+              color: C.green,
+              letterSpacing: "0.08em",
+              lineHeight: 1,
+              textShadow: `0 0 16px ${C.green}88`,
+            }}
+          >
             {line || "—"}
           </span>
-        </div>
-        {/* Last refresh kecil */}
-        <div style={{ fontSize: 8, color: C.textMut }}>
-          {lastRefresh ? lastRefresh.toLocaleTimeString("id-ID") : "—"}
         </div>
       </div>
     </div>

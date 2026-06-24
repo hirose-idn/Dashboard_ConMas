@@ -33,7 +33,6 @@ export default function PCBDashboard() {
         <DashboardHeader
           loading={d.loading}
           error={d.error}
-          lastRefresh={d.lastRefresh}
           line={d.line}
           nama_produk={d.nama_produk}
         />
@@ -51,6 +50,7 @@ export default function PCBDashboard() {
           <LeftColumn
             tanggal={d.tanggal}
             line={d.line}
+            cl_no={d.cl_no}
             nama_produk={d.nama_produk}
             personnel={d.personnel}
             lastRefresh={d.lastRefresh}

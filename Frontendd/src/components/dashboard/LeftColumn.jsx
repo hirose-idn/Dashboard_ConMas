@@ -1,9 +1,19 @@
 import React from "react";
-import { C } from "../../config/constants";
+import { C, BASE_URL } from "../../config/constants";
 import { DataBadge, Avatar, SectionTitle, KVRow } from "../ui";
 
-// ─── Placeholder QR Code ──────────────────────────────────
+// ─── QR Code — coba load foto "PCBGeneral", fallback placeholder ──
+// Taruh file di: Backendd/uploads/foto/PCBGeneral.jpg (sama folder
+// foto personel). Kalau ekstensi bukan .jpg, ganti FOTO_EXTS di bawah.
+const QR_FOTO_EXTS = ["jpg", "jpeg", "png", "webp"];
+
 function QRPlaceholder() {
+  const [extIdx, setExtIdx] = React.useState(0);
+  const allFailed = extIdx >= QR_FOTO_EXTS.length;
+  const src = !allFailed
+    ? `${BASE_URL}/foto/PCBGeneral.${QR_FOTO_EXTS[extIdx]}`
+    : null;
+
   return (
     <div
       style={{
@@ -20,21 +30,32 @@ function QRPlaceholder() {
         overflow: "hidden",
       }}
     >
-      {/* scan line animasi */}
-      <div
-        style={{
-          position: "absolute",
-          left: 0,
-          right: 0,
-          height: 2,
-          background: `linear-gradient(90deg, transparent, ${C.blue}88, transparent)`,
-          animation: "scan 2s linear infinite",
-        }}
-      />
-      <div style={{ textAlign: "center" }}>
-        <div style={{ fontSize: 16, marginBottom: 2 }}>▦</div>
-        <div style={{ fontSize: 7, color: C.textDim }}>QR Code</div>
-      </div>
+      {src ? (
+        <img
+          src={src}
+          alt="QR Code"
+          style={{ width: "100%", height: "100%", objectFit: "contain" }}
+          onError={() => setExtIdx((i) => i + 1)}
+        />
+      ) : (
+        <>
+          {/* scan line animasi — fallback kalau foto PCBGeneral gak ketemu */}
+          <div
+            style={{
+              position: "absolute",
+              left: 0,
+              right: 0,
+              height: 2,
+              background: `linear-gradient(90deg, transparent, ${C.blue}88, transparent)`,
+              animation: "scan 2s linear infinite",
+            }}
+          />
+          <div style={{ textAlign: "center" }}>
+            <div style={{ fontSize: 16, marginBottom: 2 }}>▦</div>
+            <div style={{ fontSize: 7, color: C.textDim }}>QR Code</div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -99,7 +120,14 @@ function PersonelCard({ icon, title, data, live }) {
 }
 
 // ─── Kolom kiri dashboard ─────────────────────────────────
-export default function LeftColumn({ tanggal, line, nama_produk, personnel, lastRefresh }) {
+export default function LeftColumn({
+  tanggal,
+  line,
+  cl_no,
+  nama_produk,
+  personnel,
+  lastRefresh,
+}) {
   const today = (() => {
     const now = new Date();
     return `${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, "0")}/${String(now.getDate()).padStart(2, "0")}`;
@@ -125,8 +153,12 @@ export default function LeftColumn({ tanggal, line, nama_produk, personnel, last
         }}
       >
         <KVRow label="Tanggal" value={tanggal || today} valueColor={C.blue} />
-        <KVRow label="CL No" value={personnel?.cl_no || "—"} valueColor={C.blue} />
-        <KVRow label="Nama Produk" value={nama_produk || "—"} valueColor={C.text} />
+        <KVRow label="CL No" value={cl_no || "—"} valueColor={C.blue} />
+        <KVRow
+          label="Nama Produk"
+          value={nama_produk || "—"}
+          valueColor={C.text}
+        />
 
         <div
           style={{
@@ -142,9 +174,24 @@ export default function LeftColumn({ tanggal, line, nama_produk, personnel, last
       </div>
 
       {/* ── Personel ── */}
-      <PersonelCard icon="👤" title="Cell Leader" data={personnel?.ketua} />
-      <PersonelCard icon="🔧" title="PJ Teknisi" data={personnel?.pj_teknis} />
-      <PersonelCard icon="🔍" title="Inspector" data={personnel?.inspector} />
+      <PersonelCard
+        icon="👤"
+        title="Cell Leader"
+        data={personnel?.ketua}
+        live
+      />
+      <PersonelCard
+        icon="🔧"
+        title="PJ Teknisi"
+        data={personnel?.pj_teknis}
+        live
+      />
+      <PersonelCard
+        icon="🔍"
+        title="Inspector"
+        data={personnel?.inspector}
+        live
+      />
       <div style={{ flex: 1 }} />
 
       <div

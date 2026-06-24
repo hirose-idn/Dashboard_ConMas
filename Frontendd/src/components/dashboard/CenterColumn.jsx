@@ -3,49 +3,6 @@ import { C } from "../../config/constants";
 import { fmt } from "../../config/utils";
 import { DataBadge, ProgressBar, SectionTitle, TH, TD } from "../ui";
 
-// ─── Card waktu siklus ────────────────────────────────────
-function CycleTimeCard({ label, value, alert, live = false }) {
-  const display = value !== null && value !== undefined ? value : "—";
-  return (
-    <div
-      style={{
-        background: alert ? "#2a000822" : "#001a2a22",
-        border: `1px solid ${alert ? C.red + "55" : C.green + "33"}`,
-        borderRadius: 5,
-        padding: "6px 14px",
-        textAlign: "center",
-        minWidth: 80,
-        flex: 1,
-      }}
-    >
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          gap: 4,
-          marginBottom: 2,
-        }}
-      >
-        <span style={{ fontSize: 9, color: C.textDim }}>{label}</span>
-        <DataBadge live={live} />
-      </div>
-      <div
-        style={{
-          fontSize: 22,
-          fontWeight: 900,
-          color: alert ? C.red : C.green,
-          lineHeight: 1,
-          textShadow: `0 0 14px ${alert ? C.red : C.green}55`,
-        }}
-      >
-        {display}
-      </div>
-      <div style={{ fontSize: 9, color: C.textDim, marginTop: 1 }}>sec</div>
-    </div>
-  );
-}
-
 // ─── Card metrik besar (Target/Hasil/Deviasi/PPM) ─────────
 function MetricCard({ label, value, color, noBorderRight, badge, unit }) {
   return (
@@ -102,9 +59,7 @@ function MetricCard({ label, value, color, noBorderRight, badge, unit }) {
         >
           {value}
         </span>
-        {unit && (
-          <span style={{ fontSize: 10, color: C.textDim }}>{unit}</span>
-        )}
+        {unit && <span style={{ fontSize: 10, color: C.textDim }}>{unit}</span>}
       </div>
     </div>
   );
@@ -196,6 +151,88 @@ function HourlyTable({ hourly }) {
   );
 }
 
+// ─── Card availability ringkas (Bekidoritsu/OEE) — stackable ─
+function AvailabilityCard({ icon, label, pct, color, live }) {
+  const clamped = Math.min(Math.max(pct ?? 0, 0), 100);
+  return (
+    <div
+      style={{
+        flex: 1,
+        padding: "10px 16px",
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "center",
+        gap: 7,
+        borderLeft: `3px solid ${color}`,
+        background: `radial-gradient(ellipse at 0% 50%, ${color}14, transparent 75%)`,
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          alignItems: "baseline",
+          justifyContent: "space-between",
+          gap: 8,
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <span style={{ fontSize: 13 }}>{icon}</span>
+          <span
+            style={{
+              fontSize: 10,
+              fontWeight: 800,
+              color: C.textDim,
+              textTransform: "uppercase",
+              letterSpacing: "0.08em",
+            }}
+          >
+            {label}
+          </span>
+          <DataBadge live={live} />
+        </div>
+        <span
+          style={{
+            fontSize: 24,
+            fontWeight: 900,
+            color,
+            lineHeight: 1,
+            textShadow: `0 0 16px ${color}77`,
+            fontVariantNumeric: "tabular-nums",
+          }}
+        >
+          {clamped.toFixed(0)}
+          <span style={{ fontSize: 11, fontWeight: 700, color: `${color}cc` }}>
+            %
+          </span>
+        </span>
+      </div>
+      <div
+        style={{
+          position: "relative",
+          height: 10,
+          background: "#061c2e",
+          borderRadius: 2,
+          overflow: "hidden",
+          border: `1px solid ${color}22`,
+        }}
+      >
+        <div
+          style={{
+            position: "absolute",
+            left: 0,
+            top: 0,
+            height: "100%",
+            width: `${clamped}%`,
+            background: `linear-gradient(90deg, ${color}99, ${color})`,
+            transition: "width 0.8s ease",
+            boxShadow: `0 0 8px ${color}66`,
+          }}
+        />
+      </div>
+    </div>
+  );
+}
+
 // ─── Kolom tengah dashboard ───────────────────────────────
 export default function CenterColumn({
   nama_produk,
@@ -227,43 +264,7 @@ export default function CenterColumn({
         minHeight: 0,
       }}
     >
-      {/* ── Nama produk ── */}
-      <div
-        style={{
-          borderBottom: `1px solid ${C.borderBr}`,
-          padding: "6px 14px",
-          display: "flex",
-          alignItems: "center",
-          gap: 12,
-          flexShrink: 0,
-          background: "linear-gradient(90deg, #003a52, #050f14, #003a52)",
-        }}
-      >
-        {/* Siklus — full width */}
-        <div
-          style={{
-            display: "flex",
-            gap: 8,
-            flex: 1,
-            justifyContent: "center",
-          }}
-        >
-          <CycleTimeCard
-            label="Cycle Time SWI"
-            value={cycle_time_swi}
-            alert={false}
-            live={true}
-          />
-          <CycleTimeCard
-            label="Cycle Time Actual"
-            value={cycle_time_actual}
-            alert={ctOvertime}
-            live={true}
-          />
-        </div>
-      </div>
-
-      {/* ── 4 metrik utama ── */}
+      {/* ── 4 metrik utama (Output Plan/Produksi/Deviasi/PPM) ── */}
       <div
         style={{
           display: "grid",
@@ -304,170 +305,65 @@ export default function CenterColumn({
         />
       </div>
 
-      {/* ── Bekidoritsu + OEE + Stoptime ── */}
+      {/* ── Cycle Time SWI/Actual + Total Stoptime — 1 baris, 3 card ── */}
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "1fr 1fr 1fr",
+          gridTemplateColumns: "repeat(3,1fr)",
           borderBottom: `1px solid ${C.borderBr}`,
           flexShrink: 0,
           background: `linear-gradient(180deg, ${C.border}, ${C.panelAlt})`,
         }}
       >
-        {/* Bekidoritsu */}
-        <div
-          style={{
-            padding: "14px 16px",
-            textAlign: "center",
-            minHeight: 110,
-            borderRight: `1px solid ${C.border}`,
-            display: "flex",
-            flexDirection: "column",
-            justifyContent: "center",
-            gap: 8,
-            background: `radial-gradient(ellipse at 50% 0%, ${C.blue}0a, transparent 70%)`,
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 5 }}>
-            <span style={{ fontSize: 10, color: C.blue, textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 800 }}>
-              Bekidoritsu
-            </span>
-            <DataBadge live={false} />
-          </div>
-          {availability.operator !== null ? (
-            <div style={{ display: "flex", alignItems: "baseline", justifyContent: "center", gap: 3 }}>
-              <span style={{
-                fontSize: 38,
-                fontWeight: 900,
-                color: availability.operator >= 80 ? C.blue : C.red,
-                lineHeight: 1,
-                textShadow: `0 0 20px ${availability.operator >= 80 ? C.blue : C.red}77`,
-                fontVariantNumeric: "tabular-nums",
-              }}>
-                {fmt(availability.operator, 1)}
-              </span>
-              <span style={{ fontSize: 10, color: C.textDim }}>%</span>
-            </div>
-          ) : (
-            <div style={{
-              height: 38,
-              background: `${C.blue}08`,
-              border: `1px solid ${C.blue}22`,
-              borderRadius: 4,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}>
-              <span style={{ fontSize: 9, color: `${C.blue}88`, fontStyle: "italic" }}>— data belum tersedia —</span>
-            </div>
-          )}
-        </div>
+        <MetricCard
+          label="Cycle Time SWI"
+          value={cycle_time_swi ?? "—"}
+          color={C.green}
+          badge="live"
+          unit="sec"
+        />
+        <MetricCard
+          label="Cycle Time Actual"
+          value={cycle_time_actual ?? "—"}
+          color={ctOvertime ? C.red : C.green}
+          badge="live"
+          unit="sec"
+        />
+        <MetricCard
+          label="Total Stoptime"
+          value={fmt(stoptime_menit, 1)}
+          color={C.orange}
+          noBorderRight
+          badge="live"
+          unit="menit"
+        />
+      </div>
 
-        {/* OEE */}
-        <div
-          style={{
-            padding: "14px 16px",
-            textAlign: "center",
-            minHeight: 110,
-            borderRight: `1px solid ${C.border}`,
-            display: "flex",
-            flexDirection: "column",
-            justifyContent: "center",
-            gap: 8,
-            background: `radial-gradient(ellipse at 50% 0%, ${C.green}07, transparent 70%)`,
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 5 }}>
-            <span style={{ fontSize: 10, color: C.green, textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 800 }}>
-              OEE
-            </span>
-            <DataBadge live={false} />
-          </div>
-          {availability.mesin !== null ? (
-            <div style={{ display: "flex", alignItems: "baseline", justifyContent: "center", gap: 3 }}>
-              <span style={{
-                fontSize: 38,
-                fontWeight: 900,
-                color: availability.mesin >= 80 ? C.green : C.red,
-                lineHeight: 1,
-                textShadow: `0 0 20px ${availability.mesin >= 80 ? C.green : C.red}77`,
-                fontVariantNumeric: "tabular-nums",
-              }}>
-                {fmt(availability.mesin, 1)}
-              </span>
-              <span style={{ fontSize: 10, color: C.textDim }}>%</span>
-            </div>
-          ) : (
-            <div style={{
-              height: 38,
-              background: `${C.green}08`,
-              border: `1px solid ${C.green}22`,
-              borderRadius: 4,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}>
-              <span style={{ fontSize: 9, color: `${C.green}88`, fontStyle: "italic" }}>— data belum tersedia —</span>
-            </div>
-          )}
-        </div>
-
-        {/* Stoptime */}
-        <div
-          style={{
-            padding: "14px 16px",
-            textAlign: "center",
-            minHeight: 120,
-            display: "flex",
-            flexDirection: "column",
-            justifyContent: "center",
-            gap: 8,
-            background: `radial-gradient(ellipse at 50% 0%, ${C.orange}0a, transparent 70%)`,
-          }}
-        >
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 5,
-            }}
-          >
-            <span
-              style={{
-                fontSize: 10,
-                color: C.textDim,
-                textTransform: "uppercase",
-                letterSpacing: "0.06em",
-              }}
-            >
-              Total Stoptime
-            </span>
-            <DataBadge live={true} />
-          </div>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "baseline",
-              justifyContent: "center",
-              gap: 5,
-            }}
-          >
-            <span
-              style={{
-                fontSize: 38,
-                fontWeight: 900,
-                color: C.orange,
-                lineHeight: 1,
-                textShadow: `0 0 20px ${C.orange}77`,
-                fontVariantNumeric: "tabular-nums",
-              }}
-            >
-              {fmt(stoptime_menit, 1)}
-            </span>
-            <span style={{ fontSize: 10, color: C.textDim }}>menit</span>
-          </div>
-        </div>
+      {/* ── Bekidoritsu + OEE (stacked, full width) ── */}
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          borderBottom: `1px solid ${C.borderBr}`,
+          flexShrink: 0,
+          background: `linear-gradient(180deg, ${C.border}, ${C.panelAlt})`,
+        }}
+      >
+        <AvailabilityCard
+          icon="🧍"
+          label="Bekidoritsu"
+          pct={availability.operator}
+          color={C.blue}
+          live={false}
+        />
+        <div style={{ height: 1, background: C.border }} />
+        <AvailabilityCard
+          icon="⚙️"
+          label="OEE"
+          pct={availability.mesin}
+          color={C.green}
+          live={true}
+        />
       </div>
 
       {/* ── Evaluasi Kinerja Line — scope: akumulasi cacat s.d proses bermasalah ── */}
@@ -553,9 +449,16 @@ export default function CenterColumn({
               >
                 Total Qty Reject (Bulan)
               </span>
-              <DataBadge live={false} />
+              <DataBadge live={true} />
             </div>
-            <div style={{ display: "flex", alignItems: "baseline", justifyContent: "center", gap: 3 }}>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "baseline",
+                justifyContent: "center",
+                gap: 3,
+              }}
+            >
               <span
                 style={{
                   fontSize: 28,
@@ -605,9 +508,16 @@ export default function CenterColumn({
               >
                 Akumulasi PPM Cacat
               </span>
-              <DataBadge live={false} />
+              <DataBadge live={true} />
             </div>
-            <div style={{ display: "flex", alignItems: "baseline", justifyContent: "center", gap: 3 }}>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "baseline",
+                justifyContent: "center",
+                gap: 3,
+              }}
+            >
               <span
                 style={{
                   fontSize: 28,
@@ -688,9 +598,16 @@ export default function CenterColumn({
                   >
                     {item.label}
                   </span>
-                  <DataBadge live={false} />
+                  <DataBadge live={true} />
                 </div>
-                <div style={{ display: "flex", alignItems: "baseline", justifyContent: "center", gap: 3 }}>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "baseline",
+                    justifyContent: "center",
+                    gap: 3,
+                  }}
+                >
                   <span
                     style={{
                       fontSize: 26,
@@ -701,7 +618,8 @@ export default function CenterColumn({
                       fontVariantNumeric: "tabular-nums",
                     }}
                   >
-                    {monthly[item.key] !== null && monthly[item.key] !== undefined
+                    {monthly[item.key] !== null &&
+                    monthly[item.key] !== undefined
                       ? fmt(monthly[item.key])
                       : "0"}
                   </span>

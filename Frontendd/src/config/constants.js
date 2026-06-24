@@ -1,5 +1,9 @@
+// Dev (npm start, NODE_ENV=development) → default ke backend lokal port 5000.
+// Production (npm run build, NODE_ENV=production) → default relative path ("")
+// karena frontend & backend di-serve dari origin yang sama (1 server, 1 port).
 export const BASE_URL =
-  process.env.REACT_APP_API_URL || "http://localhost:3000";
+  process.env.REACT_APP_API_URL ??
+  (process.env.NODE_ENV === "production" ? "" : "http://localhost:5000");
 export const REFRESH_MS = 5_000;
 export const FOTO_BASE_URL = `${BASE_URL}/foto`;
 
@@ -54,19 +58,9 @@ export const MOCK_DATA = {
   },
 
   availability: {
-    operator: null,
-    mesin: null,
+    operator: 88, // Bekidoritsu — mock, belum ada row mapping dari ConMas
+    mesin: 82, // OEE — mock, belum ada row mapping dari ConMas
   },
-
-  schedule: [
-    { label: "Sikat Gigi & Cuci Muka", status: "Sudah Dilakukan", done: true },
-    {
-      label: "BEBAS SERPIHAN LOGAM\n6P1C — LINI TERSERTIFIKASI",
-      status: null,
-      done: false,
-      highlight: true,
-    },
-  ],
 
   // Preventive Maintenance — mock, isi dari DB kalau sudah ada
   preventive_maintenance: {

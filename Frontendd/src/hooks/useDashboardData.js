@@ -1,33 +1,14 @@
 import { useState, useEffect, useCallback } from "react";
-import {
-  BASE_URL,
-  REFRESH_MS,
-  MOCK_DATA,
-  FOTO_BASE_URL,
-} from "../config/constants";
-import { getTodayWIB, toWIBDateStr, getActiveShift } from "../config/utils";
+import { BASE_URL, REFRESH_MS, MOCK_DATA } from "../config/constants";
+import { getTodayWIB } from "../config/utils";
 
-// ─── Status integrasi per field (sesuai Excel mapping) ───────
-// ✅ row 1  tanggal              → cluster_1_11_d
-// ✅ row 2  cl_no (kode line)      → cluster_1_7_t
-// ✅ row 3  line (nama line)       → cluster_1_12_t
-// ✅ row 3  nama_produk          → cluster_1_8_t (product_name)
-// ✅ row 4  cell_leader          → cluster_1_33_t (cell_leader_nama)
-// ✅ row 5  pj_teknis            → cluster_1_496_t (S1) / cluster_1_545_t (S2)
-// ✅ row 5  inspector            → cluster_1_497_t (S1) / cluster_1_546_t (S2)
-// ✅ row 6  cycle_time_swi       → cluster_1_70_n
-// ✅ row 7  cycle_time_actual    → cluster_1_72_n
-// ✅ row 8  output_plan          → cluster_1_468_n (S1) / cluster_1_419_n (S2)
-// ✅ row 9  output_produksi      → cluster_1_523_n (S1) / cluster_1_474_n (S2)
-// ✅ row 10 deviasi_target       → dihitung: output_produksi - output_plan
-// 🟡 row 11 qty_reject_ppm bulan → hold (ppm shift berjalan dihitung lokal)
-// ✅ row 12 stoptime_menit       → cluster_1_529_n (S1) / cluster_1_480_n (S2)
-// ✅ row 13 qty_reject           → cluster_1_516_n (S1) / cluster_1_467_n (S2)
-// 🟡 row 14 total_qty_reject 1bln→ hold
-// 🟡 row 15 proses_bermasalah    → hold
-// ✅ row 16-47 hourly rekapitulasi → dari /api/dashboard/trend
-// 🟡 reject_detail              → dari /api/dashboard/reject-detail (kalau sudah ada)
-// ─────────────────────────────────────────────────────────────
+// ─── Status integrasi per field ──────────────────────────────
+// ✅ Backend (/api/dashboard) sekarang sudah nentuin sendiri shift
+//    aktif + tanggal yg relevan (termasuk shift 2 lewat tengah malam),
+//    jadi FE gak perlu lagi logic getActiveShift() / cari row manual.
+// ✅ hourly udah ikut nempel di response /api/dashboard (gak perlu /trend lagi)
+// 🟡 reject_detail, preventive_maintenance → masih mock (lihat constants.js)
+// ────────────────────────────────────────────────────────────
 
 const INITIAL_STATE = {
   // ── Live ──────────────────────────────────────────
@@ -42,16 +23,15 @@ const INITIAL_STATE = {
   output_produksi: 0,
   deviasi_target: 0,
   qty_reject: 0,
-  qty_reject_ppm: 0, // dihitung lokal dari shift berjalan
+  qty_reject_ppm: 0,
   stoptime_menit: 0,
-  hourly: [], // dari /trend endpoint
-  trend_s1: [],
-  trend_s2: [],
+  hourly: [],
   // ── Mock ──────────────────────────────────────────
   ...MOCK_DATA,
   personnel: {
     ketua: { nama: null, no_karyawan: null, telp: null, foto: null },
-    ...MOCK_DATA.personnel,
+    pj_teknis: { nama: null, no_karyawan: null, telp: null, foto: null },
+    inspector: { nama: null, no_karyawan: null, telp: null, foto: null },
   },
   reject_detail: MOCK_DATA.reject_detail,
   preventive_maintenance: MOCK_DATA.preventive_maintenance,
@@ -74,7 +54,10 @@ function parsePersonnelField(raw) {
 
 function buildFotoUrl(nik) {
   if (!nik) return null;
-  return `${FOTO_BASE_URL}/${nik}.jpg`;
+  // Avatar component (ui/index.jsx) yang coba2 ekstensi .jpg/.jpeg/.png/.webp
+  // sendiri lewat onError — jadi di sini cukup kasih base .jpg, JANGAN pakai
+  // /foto-resolve (gak ada ekstensinya, gak kompatibel sama logic Avatar).
+  return `${BASE_URL}/foto/${nik}.jpg`;
 }
 
 export default function useDashboardData() {
@@ -84,26 +67,21 @@ export default function useDashboardData() {
     try {
       const today = getTodayWIB();
 
-      // Fetch semua endpoint sekaligus — reject-detail pakai try-catch terpisah
-      // karena endpoint ini mungkin belum ada di backend
-      const [dataRes, trendRes, monthlyRes] = await Promise.all([
+      // ── Fetch data shift aktif + akumulasi bulanan ─────────
+      const [dataRes, monthlyRes] = await Promise.all([
         fetch(`${BASE_URL}/api/dashboard`),
-        fetch(`${BASE_URL}/api/dashboard/trend?date=${today}`),
         fetch(`${BASE_URL}/api/dashboard/monthly`),
       ]);
 
       if (!dataRes.ok)
         throw new Error(`/api/dashboard: HTTP ${dataRes.status}`);
-      if (!trendRes.ok)
-        throw new Error(`/api/dashboard/trend: HTTP ${trendRes.status}`);
       if (!monthlyRes.ok)
         throw new Error(`/api/dashboard/monthly: HTTP ${monthlyRes.status}`);
 
-      const { data: rows = [] } = await dataRes.json();
-      const trendJson = await trendRes.json();
+      const d = await dataRes.json();
       const monthlyJson = await monthlyRes.json();
 
-      // Fetch reject-detail — optional, tidak crash kalau endpoint belum ada
+      // Reject-detail — optional, gak crash kalau endpoint belum ada datanya
       let rejectDetailData = null;
       try {
         const rejectRes = await fetch(
@@ -114,116 +92,56 @@ export default function useDashboardData() {
           rejectDetailData = rejectJson.data || null;
         }
       } catch (_) {
-        // endpoint belum ada — biarkan null, RightColumn akan pakai default
+        // endpoint belum siap — biarkan null, RightColumn pakai default
       }
-
-      const activeShift = getActiveShift();
-      const now = new Date();
-
-      // Cari row aktif hari ini
-      let activeRow =
-        rows.find(
-          (r) => r.shift === activeShift && toWIBDateStr(r.tanggal) === today,
-        ) || null;
-
-      // Shift 2 lewat tengah malam → cari kemarin
-      if (activeShift === "Shift 2" && now.getHours() < 7) {
-        const yesterday = new Date(now - 86_400_000);
-        const yStr = [
-          yesterday.getFullYear(),
-          String(yesterday.getMonth() + 1).padStart(2, "0"),
-          String(yesterday.getDate()).padStart(2, "0"),
-        ].join("-");
-        activeRow =
-          rows.find(
-            (r) => r.shift === "Shift 2" && toWIBDateStr(r.tanggal) === yStr,
-          ) || activeRow;
-      }
-
-      // ── Field langsung dari DB ──────────────────────────
-      const output_plan = Number(activeRow?.output_plan) || 0;
-      const output_produksi = Number(activeRow?.output_total) || 0;
-      const qty_reject = Number(activeRow?.reject_qty) || 0;
-      const stoptime_menit = Number(activeRow?.stoptime_total) || 0;
-      const cycle_time_swi =
-        activeRow?.cycle_time_swi != null
-          ? Number(activeRow.cycle_time_swi)
-          : null;
-      const cycle_time_actual =
-        activeRow?.cycle_time_actual != null
-          ? Number(activeRow.cycle_time_actual)
-          : null;
-
-      // ── Dihitung lokal ──────────────────────────────────
-      const deviasi_target = output_produksi - output_plan;
-      const qty_reject_ppm =
-        output_produksi > 0
-          ? Math.round((qty_reject / output_produksi) * 1_000_000)
-          : 0;
 
       // ── Personnel ───────────────────────────────────────
-      const parsedKetua = parsePersonnelField(activeRow?.cell_leader_nama);
-      const parsedTeknisi = parsePersonnelField(activeRow?.pj_teknis_nama);
-      const parsedInspector = parsePersonnelField(activeRow?.inspector_nama);
-      const inspectorNik = parsedInspector.nik || null;
-      const inspectorFoto = buildFotoUrl(inspectorNik);
-
-      // ── Hourly dari trend endpoint ──────────────────────
-      const trendRows =
-        activeShift === "Shift 2"
-          ? trendJson.shift2 || []
-          : trendJson.shift1 || [];
-
-      const hourly = trendRows.map((p) => ({
-        slot: p.label,
-        output_plan: p.output_plan,
-        output_actual: p.output_actual,
-        deviasi: p.deviasi,
-        pencapaian: p.pencapaian,
-      }));
-
+      const parsedKetua = parsePersonnelField(d.cell_leader_nama);
+      const parsedTeknisi = parsePersonnelField(d.pj_teknis_nama);
+      const parsedInspector = parsePersonnelField(d.inspector_nama);
       const ketuaNik = parsedKetua.nik || null;
       const teknisiNik = parsedTeknisi.nik || null;
-      const ketuaFoto = buildFotoUrl(ketuaNik);
-      const teknisiFoto = buildFotoUrl(teknisiNik);
+      const inspectorNik = parsedInspector.nik || null;
 
       setState((prev) => ({
         ...prev,
-        tanggal: activeRow ? toWIBDateStr(activeRow.tanggal) : today,
-        line: activeRow?.line || null,
-        cl_no: activeRow?.cl_no || null,
-        nama_produk: activeRow?.product_name || null,
-        cell_leader_nama: activeRow?.cell_leader_nama || null,
-        cycle_time_swi,
-        cycle_time_actual,
-        output_plan,
-        output_produksi,
-        deviasi_target,
-        qty_reject,
-        qty_reject_ppm,
-        stoptime_menit,
-        hourly,
-        trend_s1: trendJson.shift1 || [],
-        trend_s2: trendJson.shift2 || [],
+        tanggal: d.tanggal || today,
+        line: d.line || null,
+        cl_no: d.cl_no || null,
+        nama_produk: d.product_name || null,
+        cell_leader_nama: d.cell_leader_nama || null,
+        cycle_time_swi: d.cycle_time_swi ?? null,
+        cycle_time_actual: d.cycle_time_actual ?? null,
+        output_plan: Number(d.output_plan) || 0,
+        output_produksi: Number(d.output_total) || 0,
+        deviasi_target: Number(d.deviasi_target) || 0,
+        qty_reject: Number(d.reject_qty) || 0,
+        qty_reject_ppm: Number(d.qty_reject_ppm) || 0,
+        stoptime_menit: Number(d.stoptime_total) || 0,
+        hourly: d.hourly || [],
+        availability: {
+          operator: MOCK_DATA.availability.operator, // Bekidoritsu — masih mock
+          mesin: d.oee, // OEE — sekarang dari DB
+        },
         personnel: {
           ketua: {
             nama: parsedKetua.nama || prev.personnel?.ketua?.nama || null,
             no_karyawan: ketuaNik || prev.personnel?.ketua?.no_karyawan || null,
             telp: prev.personnel?.ketua?.telp || null,
-            foto: ketuaFoto,
+            foto: buildFotoUrl(ketuaNik),
           },
           pj_teknis: {
             nama: parsedTeknisi.nama || prev.personnel?.pj_teknis?.nama || null,
             no_karyawan:
               teknisiNik || prev.personnel?.pj_teknis?.no_karyawan || null,
             telp: prev.personnel?.pj_teknis?.telp || null,
-            foto: teknisiFoto,
+            foto: buildFotoUrl(teknisiNik),
           },
           inspector: {
             nama: parsedInspector.nama || null,
             no_karyawan: inspectorNik || null,
             telp: null,
-            foto: inspectorFoto,
+            foto: buildFotoUrl(inspectorNik),
           },
         },
         reject_detail: rejectDetailData,
@@ -234,6 +152,10 @@ export default function useDashboardData() {
         monthly: {
           total_qty_reject: monthlyJson.total_qty_reject,
           ppm: monthlyJson.ppm,
+          man: monthlyJson.man ?? 0,
+          machine: monthlyJson.machine ?? 0,
+          material: monthlyJson.material ?? 0,
+          method: monthlyJson.method ?? 0,
           micro_stop: null,
           proses_bermasalah: [],
         },
