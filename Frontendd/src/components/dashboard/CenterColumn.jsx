@@ -282,7 +282,7 @@ export default function CenterColumn({
           unit="pcs"
         />
         <MetricCard
-          label="Output Produksi"
+          label="Output Actual"
           value={fmt(output_produksi)}
           color={C.text}
           badge="live"
@@ -506,7 +506,7 @@ export default function CenterColumn({
                   letterSpacing: "0.04em",
                 }}
               >
-                Akumulasi PPM Cacat
+                Akumulasi REJECT PPM
               </span>
               <DataBadge live={true} />
             </div>
