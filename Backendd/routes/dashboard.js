@@ -7,7 +7,7 @@ const pool = require("../db");
 //  Untuk sekarang di-hardcode ke 1 line. Gampang diubah jadi
 //  query param (?line=...) kalau mau multi-line nanti.
 // ─────────────────────────────────────────────────────────────
-const VIEW = "view_report_25240";
+const VIEW = "view_report_25290";
 const LINE_CODE = "41HR101";
 
 // ─────────────────────────────────────────────────────────────
@@ -104,12 +104,12 @@ const HOURLY = [
   { label: "22-23", plan: "cluster_1_1831_n", actual: "cluster_1_1832_n" },
   { label: "23-24", plan: "cluster_1_1936_n", actual: "cluster_1_1937_n" },
   { label: "24-1", plan: "cluster_1_2041_n", actual: "cluster_1_2042_n" },
-  { label: "1-2", plan: "cluster_1_2146_n", actual: "cluster_1_2147_n" },
-  { label: "2-3", plan: "cluster_1_2251_n", actual: "cluster_1_2252_n" },
-  { label: "3-4", plan: "cluster_1_2356_n", actual: "cluster_1_2357_n" },
-  { label: "4-5", plan: "cluster_1_2461_n", actual: "cluster_1_2462_n" },
-  { label: "5-6", plan: "cluster_1_2566_n", actual: "cluster_1_2567_n" },
-  { label: "6-7", plan: "cluster_1_2671_n", actual: "cluster_1_2672_n" },
+  { label: "01-02", plan: "cluster_1_2146_n", actual: "cluster_1_2147_n" },
+  { label: "02-03", plan: "cluster_1_2251_n", actual: "cluster_1_2252_n" },
+  { label: "03-04", plan: "cluster_1_2356_n", actual: "cluster_1_2357_n" },
+  { label: "04-05", plan: "cluster_1_2461_n", actual: "cluster_1_2462_n" },
+  { label: "05-06", plan: "cluster_1_2566_n", actual: "cluster_1_2567_n" },
+  { label: "06-07", plan: "cluster_1_2671_n", actual: "cluster_1_2672_n" },
 ];
 
 // ─────────────────────────────────────────────────────────────
