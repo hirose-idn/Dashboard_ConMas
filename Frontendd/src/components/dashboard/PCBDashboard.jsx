@@ -68,6 +68,7 @@ export default function PCBDashboard() {
             availability={d.availability}
             monthly={d.monthly}
             hourly={d.hourly}
+            shift={d.shift}
           />
 
           <RightColumn

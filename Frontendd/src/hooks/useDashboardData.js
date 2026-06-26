@@ -119,9 +119,10 @@ export default function useDashboardData() {
         qty_reject_ppm: Number(d.qty_reject_ppm) || 0,
         stoptime_menit: Number(d.stoptime_total) || 0,
         hourly: d.hourly || [],
+        shift: d.shift || null,
         availability: {
           operator: MOCK_DATA.availability.operator, // Bekidoritsu — masih mock
-          mesin: d.oee, // OEE — sekarang dari DB
+          mesin: d.oee ?? null, // OEE dari DB (cluster_1_85_n)
         },
         personnel: {
           ketua: {

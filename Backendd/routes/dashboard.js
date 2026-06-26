@@ -40,6 +40,7 @@ const COLS = {
   stoptime_method: "cluster_1_2820_n",
   stoptime_material: "cluster_1_2843_n",
   stoptime_machine: "cluster_1_2866_n",
+  oee: "cluster_1_85_n",
 };
 
 // Slot produk 1–6, terisi sekuensial (slot N+1 baru keisi kalau ada Change Model)
@@ -190,6 +191,7 @@ router.get("/", async (req, res) => {
         ${COLS.stoptime_machine} AS stoptime_machine,
         ${COLS.stoptime_material} AS stoptime_material,
         ${COLS.stoptime_method} AS stoptime_method,
+        ${COLS.oee} AS oee,
         ${slotSelects.join(",\n        ")},
         ${hourlySelects.join(",\n        ")}
       FROM ${VIEW}
@@ -277,6 +279,7 @@ router.get("/", async (req, res) => {
       stoptime_machine: Number(row.stoptime_machine) || 0,
       stoptime_material: Number(row.stoptime_material) || 0,
       stoptime_method: Number(row.stoptime_method) || 0,
+      oee: row.oee != null ? Number(row.oee) : null,
       hourly,
       timestamp: new Date().toISOString(),
     });

@@ -3,6 +3,88 @@ import { C } from "../../config/constants";
 import { fmt } from "../../config/utils";
 import { DataBadge, ProgressBar, SectionTitle, TH, TD } from "../ui";
 
+// ─── Filter slot jam berdasarkan shift aktif ──────────────
+const SHIFT_SLOTS = {
+  "Shift 1 (2 Shift)": [
+    "07-08",
+    "08-09",
+    "09-10",
+    "10-11",
+    "11-12",
+    "12-13",
+    "13-14",
+    "14-15",
+    "15-16",
+  ],
+  "Shift 2 (2 Shift)": [
+    "22-23",
+    "23-24",
+    "24-1",
+    "01-02",
+    "02-03",
+    "03-04",
+    "04-05",
+    "05-06",
+    "06-07_2",
+  ],
+  "Shift 1 (3 Shift)": [
+    "06-07_1",
+    "07-08",
+    "08-09",
+    "09-10",
+    "10-11",
+    "11-12",
+    "12-13",
+    "13-14",
+  ],
+  "Shift 2 (3 Shift)": [
+    "14-15",
+    "15-16",
+    "16-17",
+    "17-18",
+    "18-19",
+    "19-20",
+    "20-21",
+    "21-22",
+  ],
+  "Shift 3 (3 Shift)": [
+    "22-23",
+    "23-24",
+    "24-1",
+    "01-02",
+    "02-03",
+    "03-04",
+    "04-05",
+    "05-06",
+  ],
+};
+
+function filterHourlyByShift(hourly, shift) {
+  if (!shift || !SHIFT_SLOTS[shift]) return hourly;
+
+  // Jumat (day=5): Shift 1 (2 Shift) sampai 17:00, tambah slot 16-17
+  const isFriday = new Date().getDay() === 5;
+  let allowed = [...SHIFT_SLOTS[shift]];
+  if (shift === "Shift 1 (2 Shift)" && isFriday) {
+    allowed = [...allowed, "16-17"];
+  }
+
+  const need2nd = shift === "Shift 2 (2 Shift)";
+  const need1st = shift === "Shift 1 (3 Shift)";
+  let count = 0;
+  return hourly.filter((h) => {
+    if (h.slot === "06-07") {
+      count++;
+      if (need2nd) return count === 2;
+      if (need1st) return count === 1;
+      return false;
+    }
+    return allowed.some(
+      (s) => s.replace("_1", "").replace("_2", "") === h.slot,
+    );
+  });
+}
+
 // ─── Card metrik besar (Target/Hasil/Deviasi/PPM) ─────────
 function MetricCard({ label, value, color, noBorderRight, badge, unit }) {
   return (
@@ -10,7 +92,7 @@ function MetricCard({ label, value, color, noBorderRight, badge, unit }) {
       style={{
         padding: "14px 10px",
         textAlign: "center",
-        minHeight: 120,
+        minHeight: 80,
         borderRight: noBorderRight ? "none" : `1px solid ${C.border}`,
         background: `radial-gradient(ellipse at 50% 0%, ${color}10, transparent 70%)`,
         display: "flex",
@@ -246,7 +328,9 @@ export default function CenterColumn({
   availability,
   monthly,
   hourly,
+  shift,
 }) {
+  const filteredHourly = filterHourlyByShift(hourly, shift);
   const ctOvertime =
     cycle_time_actual !== null && cycle_time_swi !== null
       ? cycle_time_actual > cycle_time_swi
@@ -669,7 +753,7 @@ export default function CenterColumn({
         </div>
 
         <div style={{ flex: 1, overflow: "auto" }}>
-          <HourlyTable hourly={hourly} />
+          <HourlyTable hourly={filteredHourly} />
         </div>
       </div>
     </div>

@@ -109,7 +109,6 @@ export default function RightColumn({ reject_detail, preventive_maintenance }) {
       ? reject_detail
       : DEFAULT_DEFECTS.map((name) => ({ defect_name: name, qty: 0 }));
 
-  const totalReject = items.reduce((sum, r) => sum + (Number(r.qty) || 0), 0);
   const isLive = !!(reject_detail && reject_detail.length > 0);
 
   return (
@@ -183,40 +182,6 @@ export default function RightColumn({ reject_detail, preventive_maintenance }) {
               })}
             </tbody>
           </table>
-        </div>
-
-        {/* ── Total Reject ── */}
-        <div
-          style={{
-            borderTop: `1px solid ${C.borderBr}`,
-            padding: "8px 12px",
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            background: totalReject > 0 ? C.redDim : "transparent",
-            flexShrink: 0,
-          }}
-        >
-          <span
-            style={{
-              fontSize: 10,
-              color: C.textDim,
-              fontWeight: 700,
-              letterSpacing: "0.06em",
-            }}
-          >
-            TOTAL REJECT
-          </span>
-          <span
-            style={{
-              fontSize: 18,
-              fontWeight: 900,
-              color: totalReject > 0 ? C.red : C.textMut,
-              textShadow: totalReject > 0 ? `0 0 12px ${C.red}88` : "none",
-            }}
-          >
-            {totalReject}
-          </span>
         </div>
       </div>
     </div>
