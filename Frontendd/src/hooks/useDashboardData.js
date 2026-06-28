@@ -26,6 +26,7 @@ const INITIAL_STATE = {
   qty_reject_ppm: 0,
   stoptime_menit: 0,
   hourly: [],
+  line_not_running: false,
   // ── Mock ──────────────────────────────────────────
   ...MOCK_DATA,
   personnel: {
@@ -60,17 +61,20 @@ function buildFotoUrl(nik) {
   return `${BASE_URL}/foto/${nik}.jpg`;
 }
 
-export default function useDashboardData() {
+export default function useDashboardData(lineCode) {
   const [state, setState] = useState(INITIAL_STATE);
 
   const refresh = useCallback(async () => {
+    if (!lineCode) return; // belum pilih line, jangan fetch apa-apa
+
     try {
       const today = getTodayWIB();
+      const lineQS = `line=${encodeURIComponent(lineCode)}`;
 
       // ── Fetch data shift aktif + akumulasi bulanan ─────────
       const [dataRes, monthlyRes] = await Promise.all([
-        fetch(`${BASE_URL}/api/dashboard`),
-        fetch(`${BASE_URL}/api/dashboard/monthly`),
+        fetch(`${BASE_URL}/api/dashboard?${lineQS}`),
+        fetch(`${BASE_URL}/api/dashboard/monthly?${lineQS}`),
       ]);
 
       if (!dataRes.ok)
@@ -85,7 +89,7 @@ export default function useDashboardData() {
       let rejectDetailData = null;
       try {
         const rejectRes = await fetch(
-          `${BASE_URL}/api/dashboard/reject-detail?date=${today}`,
+          `${BASE_URL}/api/dashboard/reject-detail?${lineQS}&date=${today}`,
         );
         if (rejectRes.ok) {
           const rejectJson = await rejectRes.json();
@@ -120,6 +124,7 @@ export default function useDashboardData() {
         stoptime_menit: Number(d.stoptime_total) || 0,
         hourly: d.hourly || [],
         shift: d.shift || null,
+        line_not_running: Boolean(d.line_not_running),
         availability: {
           operator: MOCK_DATA.availability.operator, // Bekidoritsu — masih mock
           mesin: d.oee ?? null, // OEE dari DB (cluster_1_85_n)
@@ -165,7 +170,7 @@ export default function useDashboardData() {
       console.error("Dashboard fetch error:", err.message);
       setState((prev) => ({ ...prev, loading: false, error: err.message }));
     }
-  }, []);
+  }, [lineCode]);
 
   useEffect(() => {
     refresh();

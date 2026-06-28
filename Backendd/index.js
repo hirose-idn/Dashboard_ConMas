@@ -4,6 +4,7 @@ const path = require("path");
 require("dotenv").config();
 
 const dashboardRoutes = require("./routes/dashboard");
+const linesRoutes = require("./routes/lines");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -35,6 +36,7 @@ app.get("/foto-resolve/:nik", (req, res) => {
 
 // ── Routes ─────────────────────────────────────────────────
 app.use("/api/dashboard", dashboardRoutes);
+app.use("/api/lines", linesRoutes);
 
 // ── Health check ────────────────────────────────────────────
 app.get("/api/health", (req, res) => {

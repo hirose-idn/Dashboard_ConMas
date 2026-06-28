@@ -40,6 +40,7 @@ export const GLOBAL_STYLE = `
   ::-webkit-scrollbar-thumb { background: #1a6680; border-radius: 2px; }
   @keyframes pulse-dot { 0%,100%{opacity:1;} 50%{opacity:0.3;} }
   @keyframes scan { 0%{transform:translateY(-100%);} 100%{transform:translateY(500%);} }
+  @keyframes blink-warning { 0%,100%{opacity:1;} 50%{opacity:0.45;} }
 `;
 
 // ─────────────────────────────────────────────

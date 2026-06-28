@@ -3,12 +3,29 @@ const router = express.Router();
 const pool = require("../db");
 
 // ─────────────────────────────────────────────────────────────
-//  KONFIGURASI — PCB general (semua line pakai view yang sama)
-//  Untuk sekarang di-hardcode ke 1 line. Gampang diubah jadi
-//  query param (?line=...) kalau mau multi-line nanti.
+//  KONFIGURASI — PCB general (semua line pakai view yang sama,
+//  dibedain lewat kolom Line). Line aktif + shift scheme-nya
+//  (2/3 shift) disimpan di tabel "lines" (lihat routes/lines.js),
+//  BUKAN hardcode — supaya nambah line baru gak perlu deploy ulang.
 // ─────────────────────────────────────────────────────────────
 const VIEW = "view_report_25290";
-const LINE_CODE = "41HR101";
+
+const fs = require("fs");
+const path = require("path");
+const LINES_FILE = path.join(__dirname, "..", "data", "lines.json");
+
+// Ambil config 1 line dari file registry (BUKAN dari DB vendor — lihat
+// routes/lines.js buat alasannya). null kalau gak ketemu/nonaktif.
+function getLineConfig(lineCode) {
+  let lines = [];
+  try {
+    lines = JSON.parse(fs.readFileSync(LINES_FILE, "utf8"));
+  } catch (err) {
+    if (err.code !== "ENOENT") throw err;
+  }
+  const found = lines.find((l) => l.line_code === lineCode && l.active);
+  return found || null;
+}
 
 // ─────────────────────────────────────────────────────────────
 //  MAPPING KOLOM
@@ -114,52 +131,118 @@ const HOURLY = [
 ];
 
 // ─────────────────────────────────────────────────────────────
-//  LOGIC SHIFT — Shift 1: 07:00–16:00 (Jumat s.d. 17:00)
-//                Shift 2: 22:00–07:00
-//  Jam 16/17:00–22:00 = gap (gak ada shift jalan) → default
-//  tampilkan Shift 1 (data terakhir yg baru selesai).
+//  LOGIC SHIFT — generic per shift_scheme (2 atau 3)
 //
-//  ⚠️ Value kolom `shift` di DB ternyata bentuknya "Shift 1 (2 shift)",
-//  "Shift 2 (3 shift)", dst — ada suffix mode (2-shift / 3-shift).
-//  Line 41HR101 DIASUMSIKAN selalu mode "2 shift" (sesuai boundary
-//  jam yang udah dikonfirmasi). Kalau line ini ternyata bisa pindah
-//  ke mode 3 shift, suffix ini + boundary jam Shift 1/2/3 perlu
-//  disesuaikan lagi.
+//  2 Shift: Shift 1: 07:00–16:00 (Jumat s.d. 17:00)
+//           Shift 2: 22:00–07:00
+//           Jam 16/17:00–22:00 = gap (gak ada shift jalan) → default
+//           tampilkan Shift 1 (data terakhir yg baru selesai).
+//
+//  3 Shift: Shift 1: 06:00–14:00
+//           Shift 2: 14:00–22:00
+//           Shift 3: 22:00–06:00
+//           Gak ada gap — selalu ada shift yang lagi jalan.
+//
+//  ⚠️ Value kolom `shift` di DB bentuknya "Shift 1 (2 Shift)",
+//  "Shift 2 (3 Shift)", dst — ada suffix scheme.
 // ─────────────────────────────────────────────────────────────
-const SHIFT_SCHEME = "2 Shift";
 
-function buildShiftLabel(num) {
-  return `Shift ${num} (${SHIFT_SCHEME})`;
-}
-
-function getActiveShift(nowWIB) {
+function resolveShiftAndDate(nowWIB, scheme) {
   const dow = nowWIB.getUTCDay(); // 0=Min ... 5=Jumat
   const hour = nowWIB.getUTCHours();
-  const shift1End = dow === 5 ? 17 : 16;
+  let shiftNum;
+  let useYesterday = false;
+  let startHour;
 
-  if (hour >= 7 && hour < shift1End) return buildShiftLabel(1);
-  if (hour >= 22 || hour < 7) return buildShiftLabel(2);
-  return buildShiftLabel(1); // gap → tampilkan hasil shift 1 yang baru kelar
+  if (scheme === 3) {
+    if (hour >= 6 && hour < 14) {
+      shiftNum = 1;
+      startHour = 6;
+    } else if (hour >= 14 && hour < 22) {
+      shiftNum = 2;
+      startHour = 14;
+    } else {
+      // 22:00–23:59 ATAU 00:00–05:59 → Shift 3
+      shiftNum = 3;
+      startHour = 22;
+      if (hour < 6) useYesterday = true; // tengah malam, row-nya tanggal kemarin
+    }
+  } else {
+    // default: 2 shift
+    const shift1End = dow === 5 ? 17 : 16;
+    if (hour >= 7 && hour < shift1End) {
+      shiftNum = 1;
+      startHour = 7;
+    } else if (hour >= 22 || hour < 7) {
+      shiftNum = 2;
+      startHour = 22;
+      if (hour < 7) useYesterday = true;
+    } else {
+      shiftNum = 1; // gap → tampilkan hasil shift 1 yang baru kelar
+      startHour = 7;
+    }
+  }
+
+  const shift = `Shift ${shiftNum} (${scheme} Shift)`;
+
+  // Tanggal "kalender" buat row di DB (shift yang lewat tengah malam
+  // dicatat di tanggal kemarin).
+  const baseDate = useYesterday
+    ? new Date(nowWIB.getTime() - 86_400_000)
+    : nowWIB;
+  const tanggal = baseDate.toISOString().slice(0, 10);
+
+  // Instant (jam:menit) persis kapan shift ini mulai — dipakai buat
+  // hitung "udah berapa lama shift jalan tapi row-nya belum ada".
+  const shiftStartWIB = new Date(
+    Date.UTC(
+      baseDate.getUTCFullYear(),
+      baseDate.getUTCMonth(),
+      baseDate.getUTCDate(),
+      startHour,
+      0,
+      0
+    )
+  );
+
+  return { shift, tanggal, shiftStartWIB };
 }
 
-function getQueryDateForShift(nowWIB, shift) {
-  // Shift 2 lewat tengah malam → row-nya tanggal kemarin (malam itu) kalau
-  // jam sekarang < 07:00, bukan tanggal besoknya.
-  if (shift.startsWith("Shift 2") && nowWIB.getUTCHours() < 7) {
-    const yesterday = new Date(nowWIB.getTime() - 86_400_000);
-    return yesterday.toISOString().slice(0, 10);
-  }
-  return nowWIB.toISOString().slice(0, 10);
+// Line dianggap "TIDAK RUNNING" kalau row buat shift aktif belum ada
+// SAMA SEKALI, padahal udah lewat >60 menit dari jam mulai shift.
+// Di bawah 60 menit pertama dianggap wajar (operator belum sempat
+// input/submit form), jadi gak di-flag.
+const NOT_RUNNING_THRESHOLD_MIN = 60;
+
+function isLineNotRunning(nowWIB, shiftStartWIB) {
+  const elapsedMin = (nowWIB.getTime() - shiftStartWIB.getTime()) / 60_000;
+  return elapsedMin > NOT_RUNNING_THRESHOLD_MIN;
 }
 
 // ─────────────────────────────────────────────────────────────
-//  GET /  — data shift aktif untuk LINE_CODE
+//  GET /?line=... — data shift aktif untuk line yang diminta
 // ─────────────────────────────────────────────────────────────
 router.get("/", async (req, res) => {
   try {
+    const lineCode = (req.query.line || "").trim();
+    if (!lineCode) {
+      return res.status(400).json({
+        success: false,
+        message: "Parameter ?line= wajib diisi. Cek GET /api/lines buat daftar line yang valid.",
+      });
+    }
+
+    const lineConfig = await getLineConfig(lineCode);
+    if (!lineConfig) {
+      return res.status(404).json({
+        success: false,
+        message: `Line "${lineCode}" tidak ditemukan / nonaktif. Cek GET /api/lines.`,
+      });
+    }
+
     const wib = new Date(Date.now() + 7 * 3600 * 1000);
-    const shift = getActiveShift(wib);
-    const targetDate = getQueryDateForShift(wib, shift);
+    const { shift, tanggal: targetDate, shiftStartWIB } = resolveShiftAndDate(wib, lineConfig.shift_scheme);
+    const lineNotRunning = isLineNotRunning(wib, shiftStartWIB);
 
     const slotSelects = SLOTS.flatMap((s, i) => [
       `${s.cl_no} AS slot_${i}_cl_no`,
@@ -201,15 +284,17 @@ router.get("/", async (req, res) => {
       LIMIT 1
     `;
 
-    const result = await pool.query(query, [LINE_CODE, shift, targetDate]);
+    const result = await pool.query(query, [lineCode, shift, targetDate]);
     const row = result.rows[0] || null;
 
     if (!row) {
       return res.json({
         success: true,
         data: null,
+        line: lineCode,
         shift,
         tanggal: targetDate,
+        line_not_running: lineNotRunning,
       });
     }
 
@@ -260,6 +345,7 @@ router.get("/", async (req, res) => {
       success: true,
       shift,
       tanggal: targetDate,
+      line_not_running: false,
       line: row.line,
       cell_leader_nama: row.cell_leader,
       pj_teknis_nama: row.teknisi,
@@ -294,11 +380,16 @@ router.get("/", async (req, res) => {
 });
 
 // ─────────────────────────────────────────────────────────────
-//  GET /monthly — akumulasi reject & output sebulan, LINE_CODE
-//  (gabung kedua shift, karena qty_reject ada di tiap row)
+//  GET /monthly?line=... — akumulasi reject & output sebulan
+//  (gabung semua shift, karena qty_reject ada di tiap row)
 // ─────────────────────────────────────────────────────────────
 router.get("/monthly", async (req, res) => {
   try {
+    const lineCode = (req.query.line || "").trim();
+    if (!lineCode) {
+      return res.status(400).json({ success: false, message: "Parameter ?line= wajib diisi." });
+    }
+
     const wib = new Date(Date.now() + 7 * 3600 * 1000);
     const year = wib.getUTCFullYear();
     const month = wib.getUTCMonth() + 1;
@@ -316,7 +407,7 @@ router.get("/monthly", async (req, res) => {
         AND EXTRACT(YEAR FROM (${COLS.tanggal} AT TIME ZONE 'Asia/Jakarta')) = $2
         AND EXTRACT(MONTH FROM (${COLS.tanggal} AT TIME ZONE 'Asia/Jakarta')) = $3
     `;
-    const result = await pool.query(query, [LINE_CODE, year, month]);
+    const result = await pool.query(query, [lineCode, year, month]);
     const total_output = Number(result.rows[0]?.total_output) || 0;
     const total_reject = Number(result.rows[0]?.total_reject) || 0;
     const ppm =
@@ -340,8 +431,10 @@ router.get("/monthly", async (req, res) => {
 });
 
 // ─────────────────────────────────────────────────────────────
-//  GET /reject-detail?date=YYYY-MM-DD — belum ada kolom di DB,
-//  tetap return array kosong (FE jatuh ke default defect list)
+//  GET /reject-detail?line=...&date=YYYY-MM-DD — belum ada kolom
+//  reject-per-jenis di DB, tetap return array kosong (FE jatuh ke
+//  default defect list). Parameter ?line= diterima buat konsistensi
+//  kontrak API begitu kolomnya udah ada nanti.
 // ─────────────────────────────────────────────────────────────
 router.get("/reject-detail", async (req, res) => {
   const wib = new Date(Date.now() + 7 * 3600 * 1000);

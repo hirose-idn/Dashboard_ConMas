@@ -6,8 +6,8 @@ import LeftColumn from "./LeftColumn";
 import CenterColumn from "./CenterColumn";
 import RightColumn from "./RightColumn";
 
-export default function PCBDashboard() {
-  const d = useDashboardData();
+export default function PCBDashboard({ line }) {
+  const d = useDashboardData(line);
 
   return (
     <>
@@ -77,6 +77,38 @@ export default function PCBDashboard() {
             preventive_maintenance={d.preventive_maintenance}
           />
         </div>
+
+        {d.line_not_running && (
+          <div
+            style={{
+              position: "fixed",
+              inset: 0,
+              background: "rgba(5,15,20,0.88)",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 16,
+              zIndex: 999,
+              animation: "blink-warning 4s ease-in-out infinite",
+            }}
+          >
+            <div
+              style={{
+                fontSize: 64,
+                fontWeight: 900,
+                color: C.red,
+                letterSpacing: "0.1em",
+                textShadow: `0 0 40px ${C.red}aa`,
+              }}
+            >
+              LINE TIDAK RUNNING
+            </div>
+            <div style={{ fontSize: 20, color: C.textDim, letterSpacing: "0.05em" }}>
+              Line {d.line || "—"} · {d.shift || "—"} · belum ada data masuk lebih dari 1 jam
+            </div>
+          </div>
+        )}
       </div>
     </>
   );

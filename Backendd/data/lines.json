@@ -1,0 +1,37 @@
+[
+  {
+    "line_code": "41HR101",
+    "description": "PCB Assy Line 101",
+    "shift_scheme": 2,
+    "active": true,
+    "created_at": "2026-06-28T00:00:00.000Z"
+  },
+  {
+    "line_code": "41HR130",
+    "description": "PCB Assy Line 130",
+    "shift_scheme": 2,
+    "active": true,
+    "created_at": "2026-06-28T00:00:00.000Z"
+  },
+  {
+    "line_code": "41HR124D",
+    "description": "PCB Assy Line 124D",
+    "shift_scheme": 3,
+    "active": true,
+    "created_at": "2026-06-28T00:00:00.000Z"
+  },
+  {
+    "line_code": "41HR888",
+    "description": "Test Line 888",
+    "shift_scheme": 2,
+    "active": false,
+    "created_at": "2026-06-28T15:58:40.235Z"
+  },
+  {
+    "line_code": "41HR100",
+    "description": "Line 100",
+    "shift_scheme": 3,
+    "active": true,
+    "created_at": "2026-06-28T16:15:20.534Z"
+  }
+]

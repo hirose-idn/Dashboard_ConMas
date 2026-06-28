@@ -1126,9 +1126,9 @@ export default function PCBDashboard() {
                   label="Total Waktu Berhenti (mnt)"
                   value={fmt(
                     d.stoptime_man +
-                      d.stoptime_machine +
-                      d.stoptime_material +
-                      d.stoptime_other,
+                    d.stoptime_machine +
+                    d.stoptime_material +
+                    d.stoptime_other,
                     1,
                   )}
                   color={C.orange}
